@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>コード差分ハイライト</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+  }
+  header {
+    padding: 20px 24px 14px;
+    border-bottom: 1px solid #21262d;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; font-weight: 700; }
+  header p { margin: 0; font-size: 13px; color: #8b949e; }
+
+  main { padding: 20px 24px 80px; max-width: 1600px; margin: 0 auto; }
+
+  .inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 820px) { .inputs { grid-template-columns: 1fr; } }
+
+  .pane label {
+    display: block;
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 6px;
+    font-weight: 600;
+    letter-spacing: .04em;
+  }
+  textarea {
+    width: 100%;
+    height: 230px;
+    resize: vertical;
+    background: #161b22;
+    color: #e6edf3;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    tab-size: 4;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: #1f6feb;
+    box-shadow: 0 0 0 3px rgba(31,111,235,.25);
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 18px 0 14px;
+  }
+  button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 7px;
+    border: 1px solid #30363d;
+    background: #21262d;
+    color: #e6edf3;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  button:hover { background: #30363d; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button.primary:hover { background: #388bfd; border-color: #388bfd; }
+
+  .opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #8b949e;
+    cursor: pointer;
+    user-select: none;
+  }
+  .opt input { accent-color: #1f6feb; cursor: pointer; }
+
+  .stats {
+    margin-left: auto;
+    font-size: 12px;
+    color: #8b949e;
+    font-variant-numeric: tabular-nums;
+  }
+  .stats b { color: #ff7b72; }
+
+  .result {
+    border: 1px solid #21262d;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0d1117;
+  }
+  .result-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 14px;
+    background: #161b22;
+    border-bottom: 1px solid #21262d;
+    font-size: 12px;
+    color: #8b949e;
+  }
+  .result-head .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .swatch {
+    width: 11px; height: 11px;
+    border-radius: 3px;
+    background: rgba(248,81,73,.28);
+    box-shadow: inset 0 0 0 1px rgba(248,81,73,.55);
+  }
+
+  .diff-wrap { overflow-x: auto; }
+
+  table.diff {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  table.diff col.c-ln { width: 56px; }
+
+  table.diff td {
+    vertical-align: top;
+    padding: 0 10px;
+    border-bottom: 1px solid rgba(33,38,45,.6);
+  }
+  table.diff td.ln {
+    text-align: right;
+    color: #6e7681;
+    font-size: 12px;
+    user-select: none;
+    border-right: 1px solid #21262d;
+    background: #0d1117;
+  }
+  table.diff td.code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    border-right: 1px solid #21262d;
+  }
+  table.diff td.code:last-child { border-right: none; }
+
+  tr.r-change td.code,
+  tr.r-del   td.code,
+  tr.r-ins   td.code { background: rgba(248,81,73,.07); }
+
+  td.code.empty {
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(110,118,129,.10) 0 6px,
+      transparent 6px 12px
+    );
+  }
+
+  .chg {
+    background: rgba(248,81,73,.28);
+    color: #ffa198;
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 1px rgba(248,81,73,.45);
+  }
+  tr.r-del .chg, tr.r-ins .chg {
+    background: rgba(248,81,73,.22);
+    color: #ffc1bc;
+  }
+
+  .empty-msg {
+    padding: 32px;
+    text-align: center;
+    color: #6e7681;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>コード差分ハイライト</h1>
+  <p>2つのコードを貼り付けると、違うところだけを赤色で表示します。</p>
+</header>
+
+<main>
+  <section class="inputs">
+    <div class="pane">
+      <label for="a">元のコード（A）</label>
+      <textarea id="a" spellcheck="false" placeholder="ここに元のコードを貼り付け"></textarea>
+    </div>
+    <div class="pane">
+      <label for="b">変更後のコード（B）</label>
+      <textarea id="b" spellcheck="false" placeholder="ここに変更後のコードを貼り付け"></textarea>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <button id="run" class="primary">比較する</button>
+    <button id="clear">クリア</button>
+    <button id="sample">サンプル</button>
+    <label class="opt"><input type="checkbox" id="ignoreWs"> 空白の違いを無視</label>
+    <label class="opt"><input type="checkbox" id="ignoreCase"> 大文字小文字を無視</label>
+    <span class="stats" id="stats"></span>
+  </div>
+
+  <section class="result">
+    <div class="result-head">
+      <span class="tag"><span class="swatch"></span> 差分</span>
+      <span>左＝A ／ 右＝B</span>
+    </div>
+    <div class="diff-wrap" id="diff"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const taA = $('a'), taB = $('b');
+  const diffEl = $('diff'), statsEl = $('stats');
+
+  /* ---- 上限（セル数）。超えたらメッセージ表示 ---- */
+  const MAX_CELLS_LINES = 200000000;   // 行×行 = 2億セル（ビット表で約50MB）
+  const MAX_CELLS_CHARS = 2000000;     // 1行ペアの文字×文字
+
+  /* ---------- HTMLエスケープ ---------- */
+  const esc = (s) => s.replace(/[&<>]/g, (c) =>
+    c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;');
+
+  /* ---------- LCS 差分（メモリ効率版） ----------
+   * 方向テーブルは 2bit/セル にパックして Uint8Array に格納。
+   *  0 = 対角（一致）
+   *  1 = 上へ（a 側の行を削除）
+   *  2 = 左へ（b 側の行を追加）
+   * DP 長はローリング2行分（Uint32Array）のみ保持。
+   */
+  function diffRuns(a, b, eq) {
+    const n = a.length, m = b.length;
+    const runs = [];
+
+    if (n === 0 || m === 0) {
+      if (n) runs.push({ type: 'del', aStart: 0, bStart: 0, len: n });
+      if (m) runs.push({ type: 'ins', aStart: 0, bStart: 0, len: m });
+      return runs;
+    }
+
+    const push = (type, aStart, bStart) => {
+      const last = runs[runs.length - 1];
+      if (last && last.type === type) { last.len++; return; }
+      runs.push({ type, aStart, bStart, len: 1 });
+    };
+
+    const cells = n * m;
+    let bits;
+    try {
+      bits = new Uint8Array((cells + 3) >> 2);
+    } catch (e) {
+      return null; // メモリ確保失敗
+    }
+
+    let prev = new Uint32Array(m + 1);
+    let curr = new Uint32Array(m + 1);
+
+    for (let i = n - 1; i >= 0; i--) {
+      curr[m] = 0;
+      const ai = a[i];
+      const rowBase = i * m;
+      for (let j = m - 1; j >= 0; j--) {
+        let dir, val;
+        if (eq(ai, b[j])) {
+          val = prev[j + 1] + 1;
+          dir = 0;
+        } else if (prev[j] >= curr[j + 1]) {
+          val = prev[j];
+          dir = 1;
+        } else {
+          val = curr[j + 1];
+          dir = 2;
+        }
+        curr[j] = val;
+
+        const idx = rowBase + j;
+        bits[idx >> 2] |= dir << ((idx & 3) << 1);
+      }
+      const t = prev; prev = curr; curr = t;
+    }
+
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      const idx = i * m + j;
+      const dir = (bits[idx >> 2] >> ((idx & 3) << 1)) & 3;
+      if (dir === 0)      { push('same', i, j); i++; j++; }
+      else if (dir === 1) { push('del',  i, j); i++; }
+      else                { push('ins',  i, j); j++; }
+    }
+    while (i < n) { push('del', i, j); i++; }
+    while (j < m) { push('ins', i, j); j++; }
+
+    return runs;
+  }
+
+  /* ---------- 1行どうしの文字単位差分 → HTML ---------- */
+  function charDiffHtml(la, lb) {
+    const A = Array.from(la), B = Array.from(lb);
+
+    if (A.length * B.length > MAX_CELLS_CHARS) {
+      return [
+        '<span class="chg">' + esc(la) + '</span>',
+        '<span class="chg">' + esc(lb) + '</span>'
+      ];
+    }
+
+    const ops = diffRuns(A, B, (x, y) => x === y);
+    if (!ops) {
+      return [
+        '<span class="chg">' + esc(la) + '</span>',
+        '<span class="chg">' + esc(lb) + '</span>'
+      ];
+    }
+
+    let left = '', right = '';
+    for (const op of ops) {
+      if (op.type === 'same') {
+        const t = esc(A.slice(op.aStart, op.aStart + op.len).join(''));
+        left += t;
+        right += t;
+      } else if (op.type === 'del') {
+        left += '<span class="chg">' +
+          esc(A.slice(op.aStart, op.aStart + op.len).join('')) + '</span>';
+      } else {
+        right += '<span class="chg">' +
+          esc(B.slice(op.bStart, op.bStart + op.len).join('')) + '</span>';
+      }
+    }
+    return [left, right];
+  }
+
+  /* ---------- メイン ---------- */
+  function run() {
+    const textA = taA.value;
+    const textB = taB.value;
+
+    if (textA === '' && textB === '') {
+      diffEl.innerHTML = '<div class="empty-msg">コードを入力してください</div>';
+      statsEl.textContent = '';
+      return;
+    }
+
+    const linesA = textA.split('\n');
+    const linesB = textB.split('\n');
+
+    const ignoreWs   = $('ignoreWs').checked;
+    const ignoreCase = $('ignoreCase').checked;
+
+    const norm = (s) => {
+      let t = s;
+      if (ignoreCase) t = t.toLowerCase();
+      if (ignoreWs)   t = t.replace(/\s+/g, ' ').trim();
+      return t;
+    };
+
+    const nA = linesA.map(norm);
+    const nB = linesB.map(norm);
+
+    const totalCells = linesA.length * linesB.length;
+    if (totalCells > MAX_CELLS_LINES) {
+      diffEl.innerHTML =
+        '<div class="empty-msg">' +
+        'コードが大きすぎます（行数の積が約2億セルを超えています）。<br>' +
+        'ファイルを分割して比較してください。' +
+        '</div>';
+      statsEl.textContent = '';
+      return;
+    }
+
+    const ops = diffRuns(nA, nB, (x, y) => x === y);
+    if (!ops) {
+      diffEl.innerHTML =
+        '<div class="empty-msg">メモリを確保できませんでした。行数を減らしてください。</div>';
+      statsEl.textContent = '';
+      return;
+    }
+
+    /* ---- 行の組を組み立てる ---- */
+    const rows = [];
+    let k = 0;
+
+    while (k < ops.length) {
+      const op = ops[k];
+
+      if (op.type === 'same') {
+        for (let t = 0; t < op.len; t++) {
+          const li = op.aStart + t, ri = op.bStart + t;
+          rows.push({
+            kind: 'same',
+            nL: li + 1, nR: ri + 1,
+            l: esc(linesA[li]), r: esc(linesB[ri])
+          });
+        }
+        k++;
+        continue;
+      }
+
+      const dels = [], inss = [];
+      while (k < ops.length && ops[k].type !== 'same') {
+        const o = ops[k];
+        if (o.type === 'del') {
+          for (let t = 0; t < o.len; t++) dels.push(o.aStart + t);
+        } else {
+          for (let t = 0; t < o.len; t++) inss.push(o.bStart + t);
+        }
+        k++;
+      }
+
+      const pairs = Math.min(dels.length, inss.length);
+      for (let p = 0; p < pairs; p++) {
+        const li = dels[p], ri = inss[p];
+        const [lh, rh] = charDiffHtml(linesA[li], linesB[ri]);
+        rows.push({ kind: 'change', nL: li + 1, nR: ri + 1, l: lh, r: rh });
+      }
+      for (let p = pairs; p < dels.length; p++) {
+        const li = dels[p];
+        rows.push({
+          kind: 'del', nL: li + 1, nR: null,
+          l: '<span class="chg">' + esc(linesA[li]) + '</span>', r: ''
+        });
+      }
+      for (let p = pairs; p < inss.length; p++) {
+        const ri = inss[p];
+        rows.push({
+          kind: 'ins', nL: null, nR: ri + 1,
+          l: '', r: '<span class="chg">' + esc(linesB[ri]) + '</span>'
+        });
+      }
+    }
+
+    /* ---- HTML 生成 ---- */
+    const cell = (h) => (h === '' ? '\u200b' : h);
+    const cls  = (h) => (h === '' ? 'code empty' : 'code');
+
+    const parts = [];
+    parts.push('<table class="diff">');
+    parts.push('<colgroup><col class="c-ln"><col><col class="c-ln"><col></colgroup><tbody>');
+    for (const r of rows) {
+      parts.push('<tr class="r-' + r.kind + '">');
+      parts.push('<td class="ln">' + (r.nL == null ? '' : r.nL) + '</td>');
+      parts.push('<td class="' + cls(r.l) + '">' + cell(r.l) + '</td>');
+      parts.push('<td class="ln">' + (r.nR == null ? '' : r.nR) + '</td>');
+      parts.push('<td class="' + cls(r.r) + '">' + cell(r.r) + '</td>');
+      parts.push('</tr>');
+    }
+    parts.push('</tbody></table>');
+    diffEl.innerHTML = parts.join('');
+
+    /* ---- 集計 ---- */
+    let add = 0, del = 0, chg = 0;
+    for (const r of rows) {
+      if (r.kind === 'ins') add++;
+      else if (r.kind === 'del') del++;
+      else if (r.kind === 'change') chg++;
+    }
+    statsEl.innerHTML =
+      '変更 <b>' + chg + '</b> 行 ／ 追加 <b>' + add + '</b> 行 ／ 削除 <b>' + del + '</b> 行';
+  }
+
+  /* ---------- イベント ---------- */
+  let timer = null;
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(run, 250);
+  };
+
+  taA.addEventListener('input', schedule);
+  taB.addEventListener('input', schedule);
+  $('ignoreWs').addEventListener('change', run);
+  $('ignoreCase').addEventListener('change', run);
+  $('run').addEventListener('click', run);
+
+  $('clear').addEventListener('click', () => {
+    taA.value = '';
+    taB.value = '';
+    taA.focus();
+    run();
+  });
+
+  $('sample').addEventListener('click', () => {
+    taA.value =
+      'function greet(name) {\n' +
+      '  const message = "Hello, " + name;\n' +
+      '  console.log(message);\n' +
+      '  return message;\n' +
+      '}\n' +
+      '\n' +
+      'const users = ["Alice", "Bob"];\n' +
+      'users.forEach(u => greet(u));\n';
+
+    taB.value =
+      'function greet(name, greeting = "Hello") {\n' +
+      '  const message = greeting + ", " + name + "!";\n' +
+      '  console.log(message);\n' +
+      '  return message;\n' +
+      '}\n' +
+      '\n' +
+      'const users = ["Alice", "Bob", "Carol"];\n' +
+      'for (const u of users) {\n' +
+      '  greet(u);\n' +
+      '}\n';
+
+    run();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      run();
+    }
+  });
+
+  run();
+})();
+</script>
+</body>
+</html>
